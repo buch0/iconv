@@ -1,5 +1,4 @@
 const util = require('./util.js');
-const request = require("request");
 const fs = require('fs');
 const url = require('url');
 const path = require('path');
@@ -8,19 +7,15 @@ const puppeteer = require('puppeteer');
 const sleep = ms => new Promise((r, j) => setTimeout(r, ms));
 
 (async() => {
-  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36';
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36';
 
-  const req = (options) => new Promise((resolve, reject) => {
-    return request(options, (error, meta, body) => {
-      resolve({ error: error, meta: meta, body: body });
-    });
-  });
   const videoConverter = async (ytObj) => {
     let response = null;
 
     let getHeaders = {
       'User-Agent': userAgent,
-      'Content-Length': 0,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+      'Accept-Language': 'en-US,en;q=0.9',
       'Accept-Encoding': 'gzip, deflate',
     };
 
@@ -31,8 +26,8 @@ const sleep = ms => new Promise((r, j) => setTimeout(r, ms));
       'Accept-Encoding': 'gzip, deflate',
     };
 
-    let audioUrl = new URLSearchParams(ytObj.audio_url);
-    let videoUrl = new URLSearchParams(ytObj.video_url);
+    let audioUrl = ytObj.audio_url
+    let videoUrl = ytObj.video_url
 
 
     let postData = `aaa`;
@@ -40,33 +35,38 @@ const sleep = ms => new Promise((r, j) => setTimeout(r, ms));
     
     const fileDate = new Date().toLocaleString().replace(/\x2f/g, '.').replace(/\x3a/g, '-');
 
-    for(let i = 0; i < 100; i++) {
-      videoUrl.set('sq', i);
-      
-      response = await req({
-        url: decodeURIComponent(videoUrl.toString()),
+    {
+      response = await util.request({
+        url:  audioUrl,
         method: 'GET',
         headers: getHeaders,
         data: '',
         encoding: null
       });
+  
+  
+      fs.appendFileSync(`./audio/${fileDate}.webm`, response.body, 'binary');
+    }
 
-      if(response.body.length < 10)
+    console.log('bp 1');
+
+    for(let i = 0; i < 0xdeadbeef; i++) {
+      getHeaders['Range'] = `bytes=${i}-${i+0xFFFFF}`;
+      response = await util.request({
+        url: videoUrl,
+        method: 'GET',
+        headers: getHeaders,
+        data: '',
+      });
+
+      if(response.body.length < 100)
         break;
 
       fs.appendFileSync(`./videos/${fileDate}.webm`, response.body, 'binary');
+
+      i += 0xFFFFF;
     }
-
-    response = await req({
-      url: decodeURIComponent(audioUrl.toString()),
-      method: 'GET',
-      headers: getHeaders,
-      data: '',
-      encoding: null
-    });
-
-
-    fs.appendFileSync(`./audio/${fileDate}.webm`, response.body, 'binary');
+    console.log('bp 2');
 
     const spawn = require('child_process').spawn;
 
@@ -159,6 +159,8 @@ const sleep = ms => new Promise((r, j) => setTimeout(r, ms));
 
               console.log('%cend hooking', 'color: green');
             });
+
+          let time = Date.now();
 
           for(;;) {
             if(audio_url != '' && video_url != '')
